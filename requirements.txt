@@ -1,0 +1,9 @@
+shobdoocr
+groq
+pymupdf
+pillow
+python-dotenv
+streamlit
+psycopg2-binary
+pytesseract
+easyocr
