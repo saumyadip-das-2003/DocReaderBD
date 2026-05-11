@@ -1,0 +1,22 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.env
+venv/
+*.pth
+*.pt
+
+# Node
+node_modules/
+.next/
+.vercel/
+
+# Firebase
+*-firebase-adminsdk-*.json
+serviceAccountKey.json
+
+# General
+.DS_Store
+Thumbs.db
+*.log
