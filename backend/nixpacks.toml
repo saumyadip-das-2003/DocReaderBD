@@ -2,7 +2,10 @@
 nixPkgs = ["tesseract", "tesseract-lang"]
 
 [phases.install]
-cmds = ["pip install -r requirements.txt"]
+cmds = [
+  "pip install -r requirements.txt",
+  "pip install --index-url https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple/ shobdoocr==0.1.1"
+]
 
 [start]
 cmd = "uvicorn main:app --host 0.0.0.0 --port $PORT"

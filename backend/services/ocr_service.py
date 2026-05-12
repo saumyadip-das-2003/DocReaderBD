@@ -1,4 +1,5 @@
 import os
+import traceback
 import numpy as np
 from PIL import Image
 import pytesseract
@@ -11,6 +12,7 @@ if tess_cmd:
     pytesseract.pytesseract.tesseract_cmd = tess_cmd
 
 async def run_ocr(image: Image.Image, engine: str) -> dict:
+    print(f"OCR called with engine: {engine}")
     words = []
     text = ''
 
@@ -29,6 +31,7 @@ async def run_ocr(image: Image.Image, engine: str) -> dict:
                 })
         except Exception as e:
             print(f'ShobdoOCR error: {e}')
+            traceback.print_exc()
             return await run_ocr(image, 'tesseract')
 
     elif engine == 'tesseract':
@@ -58,6 +61,7 @@ async def run_ocr(image: Image.Image, engine: str) -> dict:
             text = ' '.join(lines)
         except Exception as e:
             print(f'Tesseract error: {e}')
+            traceback.print_exc()
 
     elif engine == 'easyocr':
         try:
@@ -81,6 +85,7 @@ async def run_ocr(image: Image.Image, engine: str) -> dict:
             text = ' '.join(lines)
         except Exception as e:
             print(f'EasyOCR error: {e}')
+            traceback.print_exc()
 
     return {
         'text': text,

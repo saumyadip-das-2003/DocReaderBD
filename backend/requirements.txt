@@ -6,6 +6,4 @@ numpy
 requests
 firebase-admin
 python-multipart
-groq
 pytesseract
-easyocr
