@@ -1,63 +1,40 @@
-import Link from "next/link";
+import Link from 'next/link'
 
-const documentTypes = ["NID Card", "Birth Certificate", "Invoice", "Custom"];
-
-export default function HomePage() {
+export default function Home() {
   return (
-    <div className="bg-white">
-      <section className="mx-auto max-w-7xl px-4 py-12 sm:px-6 lg:px-8 lg:py-16">
-        <div className="max-w-3xl">
-          <p className="text-sm font-semibold uppercase tracking-wide text-teal">DocReader BD</p>
-          <h1 className="mt-3 text-4xl font-bold tracking-normal text-navy sm:text-5xl">
-            Intelligent Document Processing for Bangladeshi Enterprises.
-          </h1>
-          <p className="mt-5 text-lg leading-8 text-slate-600">
-            Build reusable document templates, read scanned Bangla and English forms, and extract structured data from
-            NID cards, certificates, invoices, and custom business documents.
-          </p>
+    <main className="max-w-4xl mx-auto px-4 py-16">
+      <div className="text-center mb-12">
+        <h1 className="text-4xl font-bold text-gray-900 mb-3">DocReader BD</h1>
+        <p className="text-lg text-gray-500 max-w-xl mx-auto">
+          Intelligent document processing for Bangladeshi enterprises.
+          Annotate once, extract forever.
+        </p>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-12">
+        <Link href="/builder" className="group block bg-white rounded-2xl border border-gray-200 p-8 hover:border-blue-400 hover:shadow-lg transition-all">
+          <div className="text-3xl mb-3">🏗️</div>
+          <h2 className="text-xl font-bold text-gray-900 mb-2 group-hover:text-blue-600">Template Builder</h2>
+          <p className="text-gray-500 text-sm">Upload a document, run OCR, click word boxes to define field labels and values. Save as a reusable template.</p>
+          <span className="inline-block mt-4 text-sm font-medium text-blue-600">Build a template →</span>
+        </Link>
+
+        <Link href="/reader" className="group block bg-white rounded-2xl border border-gray-200 p-8 hover:border-green-400 hover:shadow-lg transition-all">
+          <div className="text-3xl mb-3">📄</div>
+          <h2 className="text-xl font-bold text-gray-900 mb-2 group-hover:text-green-600">Template Reader</h2>
+          <p className="text-gray-500 text-sm">Select a saved template, upload any document of the same type, and extract structured JSON fields automatically.</p>
+          <span className="inline-block mt-4 text-sm font-medium text-green-600">Extract fields →</span>
+        </Link>
+      </div>
+
+      <div className="bg-gray-50 rounded-xl p-6 text-center">
+        <p className="text-sm font-medium text-gray-600 mb-3">Supported document types</p>
+        <div className="flex gap-3 justify-center flex-wrap">
+          {['NID Card','Birth Certificate','Invoice','Land Deed','Custom Forms'].map(t => (
+            <span key={t} className="px-3 py-1 bg-white border border-gray-200 rounded-full text-xs text-gray-600 font-medium">{t}</span>
+          ))}
         </div>
-
-        <div className="mt-10 grid gap-5 md:grid-cols-2">
-          <Link
-            href="/builder"
-            className="rounded-lg border border-slate-200 bg-white p-6 shadow-sm transition hover:border-teal hover:shadow-md"
-          >
-            <h2 className="text-2xl font-semibold text-navy">Template Builder</h2>
-            <p className="mt-3 text-slate-600">
-              Upload a sample document, run OCR, click detected words, and define label-value mappings for repeatable
-              extraction.
-            </p>
-            <span className="mt-6 inline-flex rounded-md bg-teal px-4 py-2 text-sm font-semibold text-white">
-              Start building
-            </span>
-          </Link>
-
-          <Link
-            href="/reader"
-            className="rounded-lg border border-slate-200 bg-white p-6 shadow-sm transition hover:border-teal hover:shadow-md"
-          >
-            <h2 className="text-2xl font-semibold text-navy">Template Reader</h2>
-            <p className="mt-3 text-slate-600">
-              Select a saved template, upload a matching document, and extract clean field values into a reviewable
-              table.
-            </p>
-            <span className="mt-6 inline-flex rounded-md bg-navy px-4 py-2 text-sm font-semibold text-white">
-              Extract data
-            </span>
-          </Link>
-        </div>
-
-        <section className="mt-12">
-          <h2 className="text-xl font-semibold text-navy">Supported document types</h2>
-          <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-            {documentTypes.map((type) => (
-              <div key={type} className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-4 text-slate-700">
-                {type}
-              </div>
-            ))}
-          </div>
-        </section>
-      </section>
-    </div>
-  );
+      </div>
+    </main>
+  )
 }

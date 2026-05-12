@@ -1,99 +1,95 @@
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
 
-export type WordBox = {
-  text: string;
-  box: number[];
-  script: string;
-  conf: number;
-};
-
-export type OCRResponse = {
-  text: string;
-  words: WordBox[];
-  word_count: number;
-  engine: string;
-};
-
-export type Annotation = {
-  field_name: string;
-  field_type: "label" | "value";
-  for_label: string;
-};
-
-export type TemplateField = Annotation & {
-  box: number[];
-  word: string;
-};
-
-export type Template = {
-  id?: string;
-  template_name: string;
-  document_type: string;
-  fields: TemplateField[];
-  image_width: number;
-  image_height: number;
-  image_url?: string;
-};
-
-export type ExtractionResult = {
-  document_type: string;
-  template_name: string;
-  fields: Record<string, string>;
-  raw_words: WordBox[];
-};
-
-async function parseResponse<T>(response: Response): Promise<T> {
-  if (!response.ok) {
-    const message = await response.text();
-    throw new Error(message || `Request failed with status ${response.status}`);
-  }
-  return response.json() as Promise<T>;
+export interface WordBox {
+  text: string
+  box: [number, number, number, number]
+  script: string
+  conf: number
 }
 
-export async function processOCR(file: File, engine: string): Promise<OCRResponse> {
-  const formData = new FormData();
-  formData.append("file", file);
-  formData.append("engine", engine);
-
-  const response = await fetch(`${API_URL}/ocr/process`, {
-    method: "POST",
-    body: formData,
-  });
-
-  return parseResponse<OCRResponse>(response);
+export interface TemplateField {
+  field_name: string
+  field_type: 'label' | 'value'
+  for_label: string
+  box: [number, number, number, number]
+  word: string
 }
 
-export async function saveTemplate(template: Template, imageFile: File): Promise<{ template_id: string }> {
-  const formData = new FormData();
-  formData.append("template", JSON.stringify(template));
-  formData.append("image", imageFile);
+export interface Template {
+  id?: string
+  template_name: string
+  document_type: string
+  image_width: number
+  image_height: number
+  fields: TemplateField[]
+  created_at?: string
+}
 
-  const response = await fetch(`${API_URL}/template/save`, {
-    method: "POST",
-    body: formData,
-  });
+export interface OCRResponse {
+  text: string
+  words: WordBox[]
+  word_count: number
+  engine: string
+}
 
-  return parseResponse<{ template_id: string }>(response);
+export interface ExtractionResult {
+  document_type: string
+  template_name: string
+  fields: Record<string, string>
+  raw_words: WordBox[]
+  word_count: number
+}
+
+export async function processOCR(
+  file: File,
+  engine: string = 'shobdoocr'
+): Promise<OCRResponse> {
+  const form = new FormData()
+  form.append('file', file)
+  form.append('engine', engine)
+  const res = await fetch(`${API_URL}/ocr/process`, {
+    method: 'POST', body: form
+  })
+  if (!res.ok) throw new Error('OCR failed')
+  return res.json()
+}
+
+export async function saveTemplate(template: Template): Promise<{ template_id: string }> {
+  const res = await fetch(`${API_URL}/template/save`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(template)
+  })
+  if (!res.ok) throw new Error('Save template failed')
+  return res.json()
 }
 
 export async function getTemplates(documentType?: string): Promise<Template[]> {
-  const params = documentType ? `?document_type=${encodeURIComponent(documentType)}` : "";
-  const response = await fetch(`${API_URL}/template/list${params}`, {
-    cache: "no-store",
-  });
-
-  return parseResponse<Template[]>(response);
+  const url = documentType
+    ? `${API_URL}/template/list?document_type=${documentType}`
+    : `${API_URL}/template/list`
+  const res = await fetch(url)
+  if (!res.ok) throw new Error('Failed to fetch templates')
+  const data = await res.json()
+  return data.templates
 }
 
-export async function extractFields(file: File, templateId: string): Promise<ExtractionResult> {
-  const formData = new FormData();
-  formData.append("file", file);
-  formData.append("template_id", templateId);
+export async function deleteTemplate(templateId: string): Promise<void> {
+  await fetch(`${API_URL}/template/${templateId}`, { method: 'DELETE' })
+}
 
-  const response = await fetch(`${API_URL}/reader/extract`, {
-    method: "POST",
-    body: formData,
-  });
-
-  return parseResponse<ExtractionResult>(response);
+export async function extractFields(
+  file: File,
+  templateId: string,
+  engine: string = 'shobdoocr'
+): Promise<ExtractionResult> {
+  const form = new FormData()
+  form.append('file', file)
+  form.append('template_id', templateId)
+  form.append('engine', engine)
+  const res = await fetch(`${API_URL}/reader/extract`, {
+    method: 'POST', body: form
+  })
+  if (!res.ok) throw new Error('Extraction failed')
+  return res.json()
 }

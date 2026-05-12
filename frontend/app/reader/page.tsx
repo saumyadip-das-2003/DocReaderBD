@@ -1,175 +1,146 @@
-"use client";
+'use client'
+import { useState, useEffect } from 'react'
+import { getTemplates, extractFields, Template, ExtractionResult } from '@/lib/api'
 
-import { useEffect, useMemo, useState } from "react";
-import { extractFields, getTemplates, type ExtractionResult, type Template } from "@/lib/api";
+const DOC_TYPES = [
+  { value: '', label: 'All types' },
+  { value: 'nid', label: 'NID Card' },
+  { value: 'birth_cert', label: 'Birth Certificate' },
+  { value: 'invoice', label: 'Invoice' },
+  { value: 'custom', label: 'Custom' },
+]
 
-const documentTypes = [
-  { label: "NID", value: "nid" },
-  { label: "Birth Certificate", value: "birth_cert" },
-  { label: "Invoice", value: "invoice" },
-  { label: "Custom", value: "custom" },
-];
+const ENGINES = [
+  { value: 'shobdoocr', label: 'ShobdoOCR' },
+  { value: 'tesseract', label: 'Tesseract' },
+  { value: 'easyocr', label: 'EasyOCR' },
+]
 
 export default function ReaderPage() {
-  const [documentType, setDocumentType] = useState("nid");
-  const [templates, setTemplates] = useState<Template[]>([]);
-  const [templateId, setTemplateId] = useState("");
-  const [file, setFile] = useState<File | null>(null);
-  const [result, setResult] = useState<ExtractionResult | null>(null);
-  const [status, setStatus] = useState("");
-  const [busy, setBusy] = useState(false);
+  const [docType, setDocType] = useState('')
+  const [templates, setTemplates] = useState<Template[]>([])
+  const [selectedTemplate, setSelectedTemplate] = useState('')
+  const [imageFile, setImageFile] = useState<File | null>(null)
+  const [engine, setEngine] = useState('shobdoocr')
+  const [result, setResult] = useState<ExtractionResult | null>(null)
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState('')
 
   useEffect(() => {
-    async function loadTemplates() {
-      setStatus("Loading templates...");
+    const load = async () => {
       try {
-        const items = await getTemplates(documentType);
-        setTemplates(items);
-        setTemplateId(items[0]?.id || "");
-        setStatus(items.length ? "" : "No templates found for this document type.");
-      } catch (error) {
-        setStatus(error instanceof Error ? error.message : "Could not load templates.");
-      }
+        const list = await getTemplates(docType || undefined)
+        setTemplates(list)
+        setSelectedTemplate('')
+      } catch { setError('Failed to load templates') }
     }
+    load()
+  }, [docType])
 
-    loadTemplates();
-  }, [documentType]);
-
-  const rows = useMemo(() => Object.entries(result?.fields || {}), [result]);
-
-  async function handleExtract() {
-    if (!file || !templateId) {
-      setStatus("Select a template and upload a document image.");
-      return;
-    }
-
-    setBusy(true);
-    setStatus("Extracting fields...");
+  const handleExtract = async () => {
+    if (!imageFile || !selectedTemplate) return
+    setLoading(true); setError(''); setResult(null)
     try {
-      const extraction = await extractFields(file, templateId);
-      setResult(extraction);
-      setStatus("Extraction complete.");
-    } catch (error) {
-      setStatus(error instanceof Error ? error.message : "Extraction failed.");
+      const res = await extractFields(imageFile, selectedTemplate, engine)
+      setResult(res)
+    } catch (e) {
+      setError('Extraction failed. Check backend is running.')
     } finally {
-      setBusy(false);
+      setLoading(false)
     }
   }
 
-  function handleDownload() {
-    if (!result) {
-      return;
-    }
-
-    const blob = new Blob([JSON.stringify(result, null, 2)], { type: "application/json" });
-    const url = URL.createObjectURL(blob);
-    const anchor = document.createElement("a");
-    anchor.href = url;
-    anchor.download = "docreaderbd-extraction.json";
-    anchor.click();
-    URL.revokeObjectURL(url);
+  const handleDownload = () => {
+    if (!result) return
+    const blob = new Blob([JSON.stringify(result.fields, null, 2)], { type: 'application/json' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url; a.download = `${result.template_name}_extraction.json`
+    a.click()
   }
 
   return (
-    <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
-      <div className="flex flex-col gap-2">
-        <p className="text-sm font-semibold uppercase tracking-wide text-teal">Template Reader</p>
-        <h1 className="text-3xl font-bold tracking-normal text-navy">Extract fields from a document</h1>
-      </div>
+    <div className="max-w-3xl mx-auto px-4 py-8">
+      <h1 className="text-2xl font-bold text-gray-900 mb-1">Template Reader</h1>
+      <p className="text-gray-500 text-sm mb-6">
+        Select a saved template, upload a document of the same type, and extract structured fields.
+      </p>
 
-      <section className="mt-8 grid gap-4 rounded-lg border border-slate-200 bg-white p-5 md:grid-cols-4">
-        <label className="block">
-          <span className="text-sm font-medium text-slate-700">Document type</span>
-          <select
-            value={documentType}
-            onChange={(event) => setDocumentType(event.target.value)}
-            className="focus-ring mt-2 w-full rounded-md border border-slate-300 px-3 py-2"
-          >
-            {documentTypes.map((type) => (
-              <option key={type.value} value={type.value}>
-                {type.label}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="block">
-          <span className="text-sm font-medium text-slate-700">Template</span>
-          <select
-            value={templateId}
-            onChange={(event) => setTemplateId(event.target.value)}
-            className="focus-ring mt-2 w-full rounded-md border border-slate-300 px-3 py-2"
-          >
-            {templates.map((template) => (
-              <option key={template.id} value={template.id}>
-                {template.template_name}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="block">
-          <span className="text-sm font-medium text-slate-700">Document image</span>
-          <input
-            type="file"
-            accept="image/*"
-            className="mt-2 w-full text-sm"
-            onChange={(event) => setFile(event.target.files?.[0] || null)}
-          />
-        </label>
-        <div className="flex items-end">
-          <button
-            type="button"
-            onClick={handleExtract}
-            disabled={busy}
-            className="focus-ring w-full rounded-md bg-teal px-4 py-2 font-semibold text-white disabled:bg-slate-300"
-          >
-            Extract
+      {error && (
+        <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">{error}</div>
+      )}
+
+      <div className="bg-white rounded-xl border border-gray-200 p-6 space-y-4 mb-6">
+        <div className="flex gap-4 flex-wrap">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Document type</label>
+            <select value={docType} onChange={e => setDocType(e.target.value)}
+              className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+              {DOC_TYPES.map(d => <option key={d.value} value={d.value}>{d.label}</option>)}
+            </select>
+          </div>
+
+          <div className="flex-1 min-w-48">
+            <label className="block text-sm font-medium text-gray-700 mb-1">Select template</label>
+            <select value={selectedTemplate} onChange={e => setSelectedTemplate(e.target.value)}
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+              <option value="">-- Select a template --</option>
+              {templates.map(t => (
+                <option key={t.id} value={t.id}>{t.template_name} ({t.document_type})</option>
+              ))}
+            </select>
+            {templates.length === 0 && (
+              <p className="text-xs text-gray-400 mt-1">No templates found. Create one in Template Builder.</p>
+            )}
+          </div>
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">Upload document image</label>
+          <input type="file" accept="image/*" onChange={e => setImageFile(e.target.files?.[0] || null)}
+            className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:bg-blue-50 file:text-blue-700 file:font-medium hover:file:bg-blue-100" />
+        </div>
+
+        <div className="flex gap-4 items-end flex-wrap">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">OCR Engine</label>
+            <select value={engine} onChange={e => setEngine(e.target.value)}
+              className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+              {ENGINES.map(e => <option key={e.value} value={e.value}>{e.label}</option>)}
+            </select>
+          </div>
+
+          <button onClick={handleExtract}
+            disabled={!imageFile || !selectedTemplate || loading}
+            className="px-6 py-2.5 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed">
+            {loading ? 'Extracting...' : 'Extract Fields'}
           </button>
         </div>
-      </section>
+      </div>
 
-      {status ? <p className="mt-4 rounded-md bg-slate-100 px-4 py-3 text-sm text-slate-700">{status}</p> : null}
-
-      {result ? (
-        <section className="mt-8 rounded-lg border border-slate-200 bg-white">
-          <div className="flex flex-col gap-3 border-b border-slate-200 p-5 sm:flex-row sm:items-center sm:justify-between">
+      {result && (
+        <div className="bg-white rounded-xl border border-gray-200 p-6">
+          <div className="flex items-center justify-between mb-4">
             <div>
-              <h2 className="text-xl font-semibold text-navy">{result.template_name}</h2>
-              <p className="text-sm text-slate-500">{result.document_type}</p>
+              <h2 className="font-bold text-gray-900">{result.template_name}</h2>
+              <p className="text-xs text-gray-500">{result.word_count} words detected · {Object.keys(result.fields).length} fields extracted</p>
             </div>
-            <button
-              type="button"
-              onClick={handleDownload}
-              className="focus-ring rounded-md bg-navy px-4 py-2 text-sm font-semibold text-white"
-            >
-              Download JSON
+            <button onClick={handleDownload}
+              className="px-4 py-2 text-sm rounded-lg bg-gray-100 text-gray-700 hover:bg-gray-200 font-medium">
+              ↓ Download JSON
             </button>
           </div>
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[520px] border-collapse text-left">
-              <thead className="bg-slate-50 text-sm text-slate-500">
-                <tr>
-                  <th className="px-5 py-3 font-semibold">Field</th>
-                  <th className="px-5 py-3 font-semibold">Value</th>
-                  <th className="px-5 py-3 font-semibold">Confidence</th>
-                </tr>
-              </thead>
-              <tbody>
-                {rows.map(([field, value]) => (
-                  <tr key={field} className="border-t border-slate-100">
-                    <td className="px-5 py-4 font-medium text-navy">{field}</td>
-                    <td className="px-5 py-4 text-slate-700">{value}</td>
-                    <td className="px-5 py-4">
-                      <span className="rounded-full bg-teal/10 px-3 py-1 text-sm font-semibold text-teal">
-                        Estimated
-                      </span>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+
+          <div className="divide-y divide-gray-100">
+            {Object.entries(result.fields).map(([key, value]) => (
+              <div key={key} className="py-3 flex gap-4">
+                <span className="text-sm font-medium text-gray-600 w-40 flex-shrink-0">{key}</span>
+                <span className="text-sm text-gray-900 font-mono">{value || '—'}</span>
+              </div>
+            ))}
           </div>
-        </section>
-      ) : null}
+        </div>
+      )}
     </div>
-  );
+  )
 }

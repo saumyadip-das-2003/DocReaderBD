@@ -1,38 +1,41 @@
-from io import BytesIO
-
-from fastapi import APIRouter, File, Form, HTTPException, UploadFile
+from fastapi import APIRouter, UploadFile, File, Form, HTTPException
 from PIL import Image
-
-from models.schemas import ExtractionResult
-from services import firebase_service, spatial_service
+import io
 from services.ocr_service import run_ocr
+from services.firebase_service import get_template_by_id
+from services.spatial_service import extract_fields
 
+router = APIRouter(prefix='/reader', tags=['reader'])
 
-router = APIRouter(prefix="/reader", tags=["reader"])
-
-
-@router.post("/extract", response_model=ExtractionResult)
-async def extract_document(
+@router.post('/extract')
+async def extract(
     file: UploadFile = File(...),
     template_id: str = Form(...),
-) -> ExtractionResult:
-    try:
-        template = await firebase_service.get_template_by_id(template_id)
-        if not template:
-            raise HTTPException(status_code=404, detail="Template not found")
+    engine: str = Form(default='tesseract')
+):
+    template = await get_template_by_id(template_id)
+    if not template:
+        raise HTTPException(status_code=404, detail='Template not found')
 
-        image_bytes = await file.read()
-        image = Image.open(BytesIO(image_bytes)).convert("RGB")
-        ocr_result = await run_ocr(image, "shobdoocr")
-        fields = spatial_service.extract_fields(ocr_result["words"], template)
+    contents = await file.read()
+    image = Image.open(io.BytesIO(contents)).convert('RGB')
+    
+    # Pass actual image dimensions to spatial service
+    image_w, image_h = image.size
 
-        return ExtractionResult(
-            document_type=template.get("document_type", "custom"),
-            template_name=template.get("template_name", ""),
-            fields=fields,
-            raw_words=ocr_result["words"],
-        )
-    except HTTPException:
-        raise
-    except Exception as exc:
-        raise HTTPException(status_code=500, detail=str(exc)) from exc
+    ocr_result = await run_ocr(image, engine)
+
+    extracted = extract_fields(
+        ocr_result['words'], 
+        template,
+        image_w,
+        image_h
+    )
+
+    return {
+        'document_type': template['document_type'],
+        'template_name': template['template_name'],
+        'fields': extracted,
+        'raw_words': ocr_result['words'],
+        'word_count': ocr_result['word_count']
+    }

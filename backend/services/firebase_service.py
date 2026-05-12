@@ -1,70 +1,80 @@
 import os
-from uuid import uuid4
-
+import json
+from datetime import datetime
 import firebase_admin
+from firebase_admin import credentials, firestore
 from dotenv import load_dotenv
-from firebase_admin import credentials, firestore, storage
-
 
 load_dotenv()
 
+db = None
 
-def _initialize_firebase() -> None:
+def init_firebase():
+    global db
     if firebase_admin._apps:
+        db = firestore.client()
         return
 
-    credentials_path = os.getenv("FIREBASE_CREDENTIALS_PATH")
-    storage_bucket = os.getenv("FIREBASE_STORAGE_BUCKET")
+    # Option 1: JSON string in env var (Railway)
+    cred_json = os.getenv('FIREBASE_CREDENTIALS_JSON')
+    if cred_json:
+        try:
+            cred_dict = json.loads(cred_json)
+            cred = credentials.Certificate(cred_dict)
+            firebase_admin.initialize_app(cred)
+            db = firestore.client()
+            print('Firebase initialized from env variable')
+            return
+        except Exception as e:
+            print(f'Firebase env init failed: {e}')
 
-    if not credentials_path:
-        raise RuntimeError("FIREBASE_CREDENTIALS_PATH is not configured")
+    # Option 2: JSON file (local development)
+    cred_path = os.getenv('FIREBASE_CREDENTIALS_PATH', 'serviceAccountKey.json')
+    if os.path.exists(cred_path):
+        try:
+            cred = credentials.Certificate(cred_path)
+            firebase_admin.initialize_app(cred)
+            db = firestore.client()
+            print(f'Firebase initialized from file: {cred_path}')
+            return
+        except Exception as e:
+            print(f'Firebase file init failed: {e}')
 
-    options = {"storageBucket": storage_bucket} if storage_bucket else None
-    cred = credentials.Certificate(credentials_path)
-    firebase_admin.initialize_app(cred, options)
+    print('WARNING: Firebase not initialized')
 
+init_firebase()
 
-def _db():
-    _initialize_firebase()
-    return firestore.client()
+TEMPLATES_COLLECTION = 'templates'
 
+async def save_template(template: dict) -> str:
+    if not db:
+        raise Exception('Firebase not initialized')
+    doc_ref = db.collection(TEMPLATES_COLLECTION).document()
+    template['id'] = doc_ref.id
+    template['created_at'] = datetime.utcnow().isoformat()
+    doc_ref.set(template)
+    return doc_ref.id
 
-def _bucket():
-    _initialize_firebase()
-    return storage.bucket()
-
-
-async def save_template(template: dict, image_bytes: bytes) -> str:
-    template_id = str(uuid4())
-    payload = {**template, "id": template_id}
-
-    if image_bytes:
-        blob = _bucket().blob(f"templates/{template_id}/sample.jpg")
-        blob.upload_from_string(image_bytes, content_type="image/jpeg")
-        blob.make_public()
-        payload["image_url"] = blob.public_url
-
-    _db().collection("templates").document(template_id).set(payload)
-    return template_id
-
-
-async def get_templates(document_type: str | None = None) -> list[dict]:
-    query = _db().collection("templates")
+async def get_templates(document_type: str = None) -> list:
+    if not db:
+        return []
+    col = db.collection(TEMPLATES_COLLECTION)
     if document_type:
-        query = query.where("document_type", "==", document_type)
-
-    return [doc.to_dict() | {"id": doc.id} for doc in query.stream()]
-
+        query = col.where('document_type', '==', document_type)
+    else:
+        query = col
+    docs = query.stream()
+    return [doc.to_dict() for doc in docs]
 
 async def get_template_by_id(template_id: str) -> dict:
-    doc = _db().collection("templates").document(template_id).get()
-    if not doc.exists:
-        return {}
-    return doc.to_dict() | {"id": doc.id}
+    if not db:
+        return None
+    doc = db.collection(TEMPLATES_COLLECTION).document(template_id).get()
+    if doc.exists:
+        return doc.to_dict()
+    return None
 
-
-async def delete_template(template_id: str) -> None:
-    _db().collection("templates").document(template_id).delete()
-    bucket = _bucket()
-    for blob in bucket.list_blobs(prefix=f"templates/{template_id}/"):
-        blob.delete()
+async def delete_template(template_id: str):
+    if not db:
+        return
+    db.collection(TEMPLATES_COLLECTION).document(template_id).delete()

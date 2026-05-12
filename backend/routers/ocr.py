@@ -1,26 +1,16 @@
-from io import BytesIO
-
-from fastapi import APIRouter, File, Form, HTTPException, UploadFile
+from fastapi import APIRouter, UploadFile, File, Form
 from PIL import Image
-
-from models.schemas import OCRResponse
+import io
 from services.ocr_service import run_ocr
 
+router = APIRouter(prefix='/ocr', tags=['ocr'])
 
-router = APIRouter(prefix="/ocr", tags=["ocr"])
-
-
-@router.post("/process", response_model=OCRResponse)
+@router.post('/process')
 async def process_ocr(
     file: UploadFile = File(...),
-    engine: str = Form("shobdoocr"),
-) -> OCRResponse:
-    try:
-        image_bytes = await file.read()
-        image = Image.open(BytesIO(image_bytes)).convert("RGB")
-        result = await run_ocr(image, engine)
-        return OCRResponse(**result)
-    except HTTPException:
-        raise
-    except Exception as exc:
-        raise HTTPException(status_code=500, detail=str(exc)) from exc
+    engine: str = Form(default='shobdoocr')
+):
+    contents = await file.read()
+    image = Image.open(io.BytesIO(contents)).convert('RGB')
+    result = await run_ocr(image, engine)
+    return result
