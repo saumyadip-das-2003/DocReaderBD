@@ -1,4 +1,4 @@
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://docreaderbd-production.up.railway.app'
+const API_URL = 'https://docreaderbd-production.up.railway.app'
 
 export interface WordBox {
   text: string
