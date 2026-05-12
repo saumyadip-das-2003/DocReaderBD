@@ -1,9 +1,9 @@
 [phases.install]
 cmds = [
-  "apt-get update && apt-get install -y tesseract-ocr tesseract-ocr-ben tesseract-ocr-eng",
+  "apt-get update -y && apt-get install -y tesseract-ocr tesseract-ocr-ben tesseract-ocr-eng",
   "pip install -r requirements.txt",
   "pip install --index-url https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple/ shobdoocr==0.1.1"
 ]
 
-[start]
-cmd = "uvicorn main:app --host 0.0.0.0 --port $PORT"
+[deploy]
+startCmd = "uvicorn main:app --host 0.0.0.0 --port $PORT"
