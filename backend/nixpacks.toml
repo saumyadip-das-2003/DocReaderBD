@@ -1,8 +1,6 @@
-[phases.setup]
-aptPkgs = ["tesseract-ocr", "tesseract-ocr-ben", "tesseract-ocr-eng"]
-
 [phases.install]
 cmds = [
+  "apt-get update && apt-get install -y tesseract-ocr tesseract-ocr-ben tesseract-ocr-eng",
   "pip install -r requirements.txt",
   "pip install --index-url https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple/ shobdoocr==0.1.1"
 ]
