@@ -1,5 +1,5 @@
 [phases.setup]
-nixPkgs = ["tesseract", "tesseract-lang"]
+aptPkgs = ["tesseract-ocr", "tesseract-ocr-ben", "tesseract-ocr-eng"]
 
 [phases.install]
 cmds = [
