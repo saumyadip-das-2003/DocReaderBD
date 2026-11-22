@@ -15,7 +15,7 @@ def init_firebase():
         db = firestore.client()
         return
 
-    # Option 1: JSON string in env var (Railway)
+    # Option 1: JSON string in a server environment variable
     cred_json = os.getenv('FIREBASE_CREDENTIALS_JSON')
     if cred_json:
         try:

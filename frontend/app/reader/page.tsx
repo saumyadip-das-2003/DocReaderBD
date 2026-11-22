@@ -44,7 +44,7 @@ export default function ReaderPage() {
       const res = await extractFields(imageFile, selectedTemplate, engine)
       setResult(res)
     } catch (e) {
-      setError('Extraction failed. Check backend is running.')
+      setError(e instanceof Error ? e.message : 'Extraction failed.')
     } finally {
       setLoading(false)
     }

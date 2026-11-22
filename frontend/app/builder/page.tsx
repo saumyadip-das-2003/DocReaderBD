@@ -52,7 +52,7 @@ export default function BuilderPage() {
       setWords(result.words)
       setStep(2)
     } catch (e) {
-      setError('OCR failed. Check backend is running.')
+      setError(e instanceof Error ? e.message : 'OCR failed.')
     } finally {
       setLoading(false)
     }
