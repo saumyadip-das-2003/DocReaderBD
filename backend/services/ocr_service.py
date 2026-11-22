@@ -1,8 +1,11 @@
+import asyncio
+import io
 import os
 import traceback
 import numpy as np
 from PIL import Image
 import pytesseract
+import requests
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -11,6 +14,51 @@ tess_cmd = os.getenv('TESSERACT_CMD')
 if tess_cmd:
     pytesseract.pytesseract.tesseract_cmd = tess_cmd
 
+SHOBDOOCR_API_URL = os.getenv('SHOBDOOCR_API_URL', '').rstrip('/')
+SHOBDOOCR_TIMEOUT_SECONDS = max(
+    float(os.getenv('SHOBDOOCR_TIMEOUT_SECONDS', '120')),
+    120.0
+)
+
+
+def _shobdoocr_url(path: str) -> str:
+    if not SHOBDOOCR_API_URL:
+        raise RuntimeError('SHOBDOOCR_API_URL is not configured')
+    return f'{SHOBDOOCR_API_URL}/{path.lstrip("/")}'
+
+
+def _request_shobdoocr(image: Image.Image) -> dict:
+    image_buffer = io.BytesIO()
+    image.convert('RGB').save(image_buffer, format='PNG')
+    image_buffer.seek(0)
+
+    # Let requests create the multipart Content-Type header and boundary.
+    response = requests.post(
+        _shobdoocr_url('/ocr'),
+        files={'file': ('document.png', image_buffer, 'image/png')},
+        timeout=SHOBDOOCR_TIMEOUT_SECONDS
+    )
+    response.raise_for_status()
+
+    payload = response.json()
+    if not isinstance(payload.get('full_text'), str):
+        raise ValueError('ShobdoOCR response is missing the full_text field')
+    return payload
+
+
+async def check_shobdoocr_health() -> bool:
+    try:
+        response = await asyncio.to_thread(
+            requests.get,
+            _shobdoocr_url('/health'),
+            timeout=SHOBDOOCR_TIMEOUT_SECONDS
+        )
+        response.raise_for_status()
+        return response.json() == {'status': 'healthy'}
+    except (requests.RequestException, ValueError, RuntimeError):
+        return False
+
+
 async def run_ocr(image: Image.Image, engine: str) -> dict:
     print(f"OCR called with engine: {engine}")
     words = []
@@ -18,17 +66,27 @@ async def run_ocr(image: Image.Image, engine: str) -> dict:
 
     if engine == 'shobdoocr':
         try:
-            from shobdoocr import OCR
-            ocr = OCR()
-            results = ocr.read(image)
-            text = ocr.read_text(image)
-            for r in results:
+            payload = await asyncio.to_thread(_request_shobdoocr, image)
+            text = payload['full_text']
+            for r in payload.get('words', []):
+                if not isinstance(r, dict) or not r.get('text') or not r.get('box'):
+                    continue
                 words.append({
                     'text': r['text'],
                     'box': r['box'],
                     'script': r.get('script', 'unknown'),
-                    'conf': float(r.get('conf', 0.0))
+                    'conf': float(r.get('confidence', r.get('conf', 0.0)))
                 })
+        except requests.Timeout as e:
+            print(f'ShobdoOCR timed out after {SHOBDOOCR_TIMEOUT_SECONDS}s: {e}')
+            return await run_ocr(image, 'tesseract')
+        except requests.HTTPError as e:
+            status = e.response.status_code if e.response is not None else 'unknown'
+            print(f'ShobdoOCR returned HTTP {status}: {e}')
+            return await run_ocr(image, 'tesseract')
+        except requests.RequestException as e:
+            print(f'ShobdoOCR request failed: {e}')
+            return await run_ocr(image, 'tesseract')
         except Exception as e:
             print(f'ShobdoOCR error: {e}')
             traceback.print_exc()

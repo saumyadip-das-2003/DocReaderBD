@@ -14,11 +14,6 @@ COPY requirements.txt .
 
 RUN pip install --no-cache-dir -r requirements.txt
 
-RUN pip install --no-cache-dir \
-    --index-url https://test.pypi.org/simple/ \
-    --extra-index-url https://pypi.org/simple/ \
-    shobdoocr==0.1.1
-
 COPY . .
 
 ENV TESSERACT_CMD=/usr/bin/tesseract
